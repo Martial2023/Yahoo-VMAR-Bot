@@ -1,0 +1,45 @@
+# --- Python (backend) ---
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/*.egg-info/
+**/build/
+**/dist/
+backend/.venv/
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# --- Backend runtime / secrets — NEVER commit ---
+backend/.env
+backend/.env.*
+!backend/.env.example
+backend/data/
+backend/logs/
+backend/sessions/
+
+# --- Node / Next.js (frontend) — secondé par frontend/.gitignore ---
+frontend/node_modules/
+frontend/.next/
+frontend/.vercel/
+frontend/out/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+frontend/lib/generated/
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs / temp ---
+*.log
+*.tmp
+
+# --- Claude Code local config ---
+.claude/settings.local.json

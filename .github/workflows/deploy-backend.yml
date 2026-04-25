@@ -1,0 +1,42 @@
+name: Deploy backend to VPS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: {}
+
+# Empêche deux déploiements de se chevaucher
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH + git pull + deploy.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script_stop: true
+          command_timeout: 12m
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_PROJECT_PATH }}"
+
+            echo "==> Fetching latest changes"
+            git fetch --all --prune
+            git reset --hard origin/main
+
+            echo "==> Running deploy.sh"
+            cd backend
+            bash deploy.sh

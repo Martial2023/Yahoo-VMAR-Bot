@@ -1,0 +1,134 @@
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+
+
+model BotSettings {
+  id                Int      @id @default(1)
+  botEnabled        Boolean  @default(true)                                @map("bot_enabled")
+  mode              String   @default("both")                              // "reply" | "post" | "both"
+  ticker            String   @default("VMAR")
+  checkIntervalMin  Int      @default(120)                                 @map("check_interval_min")
+  checkIntervalMax  Int      @default(300)                                 @map("check_interval_max")
+  maxRepliesPerHour Int      @default(5)                                   @map("max_replies_per_hour")
+  maxPostsPerDay    Int      @default(3)                                   @map("max_posts_per_day")
+  aiModel           String   @default("anthropic/claude-sonnet-4-20250514") @map("ai_model")
+  aiTemperature     Float    @default(0.7)                                 @map("ai_temperature")
+  replyPrompt       String   @db.Text                                       @map("reply_prompt")
+  postPrompt        String   @db.Text                                       @map("post_prompt")
+  alertEmails       String[] @default([])                                  @map("alert_emails")
+  updatedAt         DateTime @updatedAt                                    @map("updated_at")
+
+  @@map("bot_settings")
+}
+
+model SeenComment {
+  id        String   @id
+  author    String
+  content   String   @db.Text
+  scrapedAt DateTime @default(now()) @map("scraped_at")
+
+  @@map("seen_comments")
+}
+
+model BotActivity {
+  id        BigInt   @id @default(autoincrement())
+  runId     String?  @map("run_id")                  // FK logique -> bot_runs.id, pas contraint
+  type      String                                    // "scrape" | "reply" | "post" | "login" | "session" | "error"
+  status    String                                    // "success" | "failed" | "skipped"
+  commentId String?  @map("comment_id")
+  content   String?  @db.Text
+  errorMsg  String?  @db.Text @map("error_msg")
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([type, status])
+  @@index([runId])
+  @@map("bot_activities")
+}
+
+model BotRun {
+  id              String    @id
+  startedAt       DateTime  @default(now()) @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  status          String    @default("running")                       // "running" | "success" | "failed"
+  commentsScraped Int       @default(0) @map("comments_scraped")
+  repliesPosted   Int       @default(0) @map("replies_posted")
+  postsPublished  Int       @default(0) @map("posts_published")
+  errorsCount     Int       @default(0) @map("errors_count")
+  triggeredBy     String    @default("schedule") @map("triggered_by") // "schedule" | "manual"
+
+  @@index([startedAt])
+  @@map("bot_runs")
+}

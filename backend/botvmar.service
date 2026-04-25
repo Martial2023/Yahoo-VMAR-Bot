@@ -1,0 +1,34 @@
+[Unit]
+Description=BotVMAR — Yahoo Finance VMAR community bot worker + control API
+Documentation=https://github.com/your-org/botvmar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__DIR__
+EnvironmentFile=__DIR__/.env
+ExecStart=__DIR__/.venv/bin/python -m botvmar.main
+
+# Auto-restart on failure
+Restart=on-failure
+RestartSec=10s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Logs go to journald (view with: journalctl -u botvmar -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=botvmar
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=__DIR__/data __DIR__/logs __DIR__/sessions
+
+[Install]
+WantedBy=multi-user.target

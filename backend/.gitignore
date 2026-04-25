@@ -1,0 +1,24 @@
+# Virtualenvs
+.venv/
+venv/
+
+# Python build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Runtime — NEVER commit
+.env
+.env.*
+!.env.example
+data/
+logs/
+sessions/
