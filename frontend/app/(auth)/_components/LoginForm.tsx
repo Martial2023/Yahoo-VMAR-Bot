@@ -27,7 +27,7 @@ const LoginForm = ({ className, ...props }: React.ComponentProps<"div">) => {
       {
         onRequest: () => setLoading(true),
         onResponse: () => setLoading(false),
-        onError: (ctx) => toast.error(ctx.error.message),
+        onError: (ctx) => { toast.error(ctx.error.message) },
         onSuccess: () => router.push(redirectTo),
       },
     );
