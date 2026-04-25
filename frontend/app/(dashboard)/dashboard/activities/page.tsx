@@ -19,7 +19,7 @@ const PAGE_SIZE = 50;
 function statusBadge(status: string) {
   if (status === "success") return <Badge variant="default" className="bg-green-500">{status}</Badge>;
   if (status === "failed") return <Badge variant="destructive">{status}</Badge>;
-  return <Badge variant="bg-orange-500">{status}</Badge>;
+  return <Badge className="bg-orange-500">{status}</Badge>;
 }
 
 type SearchParams = Promise<{ page?: string; type?: string; status?: string }>;
