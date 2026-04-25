@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 function statusBadge(status: string) {
-  if (status === "success") return <Badge variant="success">{status}</Badge>;
+  if (status === "success") return <Badge variant="default" className="bg-green-500">{status}</Badge>;
   if (status === "failed") return <Badge variant="destructive">{status}</Badge>;
   return <Badge variant="warning">{status}</Badge>;
 }
