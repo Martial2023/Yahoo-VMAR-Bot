@@ -1,4 +1,4 @@
-import { Code, Group, Component } from 'lucide-react'
+import { TrendingUp, Group, Component } from 'lucide-react'
 import React from 'react'
 import Image from 'next/image'
 
@@ -9,9 +9,9 @@ export default function Logo() {
                 <Component className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold">BBros</span> */}
-            <Code />
+            <TrendingUp />
             <h2 className="text-2xl font-bold flex items-center">
-                Nullify
+                VMAR Bot
             </h2>
         </div>
     )
