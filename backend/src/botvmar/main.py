@@ -73,5 +73,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    """" Lunchingr """
+    """" Lunchingr the main function when running this file directly. """
     main()

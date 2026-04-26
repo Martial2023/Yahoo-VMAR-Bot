@@ -1,13 +1,3 @@
-"""FastAPI control surface — Vercel frontend talks to this on the VPS.
-
-Endpoints (all protected by Bearer token from .env API_TOKEN, except /health):
-  GET  /health           — uptime probe, no auth
-  GET  /status           — runtime settings snapshot + queued trigger flag
-  POST /trigger-cycle    — wake worker to run a cycle now
-  POST /reload-config    — force reload of runtime settings from Postgres
-  POST /stop             — request graceful shutdown
-"""
-
 from __future__ import annotations
 
 from fastapi import Depends, FastAPI, Header, HTTPException, status
@@ -48,7 +38,10 @@ class SimpleResponse(BaseModel):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "message": "BotVMAR API is running",
+    }
 
 
 @app.get("/status", response_model=StatusResponse, dependencies=[Depends(_require_token)])

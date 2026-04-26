@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from playwright.async_api import Page
 
-from botvmar.browser.stealth import human_click, human_delay
+from botvmar.browser.stealth import human_delay
 from botvmar.config.env import SCREENSHOTS_DIR
 from botvmar.utils.logger import get_logger
 
 logger = get_logger("poster")
+
+
+async def _safe_screenshot(page: Page, name: str) -> None:
+    """Take a screenshot, silently ignoring errors (closed page, etc.)."""
+    try:
+        await page.screenshot(
+            path=str(SCREENSHOTS_DIR / name),
+            timeout=10000,
+        )
+    except Exception:
+        pass
 
 
 async def reply_to_comment(
@@ -21,8 +32,14 @@ async def reply_to_comment(
     try:
         comment_el = page.locator(comment_selector).nth(comment_index)
 
-        # SELECTOR (Yahoo 2026): le bouton "Comment" sous chaque post ouvre la
-        # zone de réponse. L'ancien "Reply" n'existe plus.
+        # Vérifier que l'élément est visible avant d'agir
+        try:
+            await comment_el.scroll_into_view_if_needed(timeout=5000)
+        except Exception:
+            logger.warning("Comment %d not visible/accessible", comment_index)
+            return False
+
+        # Le bouton "Comment" sous chaque post ouvre la zone de réponse.
         reply_button_selectors = [
             '[data-testid="comment-action"]',
             'button:has-text("Comment")',
@@ -33,29 +50,23 @@ async def reply_to_comment(
             try:
                 btn = comment_el.locator(btn_sel).first
                 if await btn.is_visible(timeout=3000):
-                    await human_click(page, f"{comment_selector}:nth-child({comment_index + 1}) {btn_sel}")
-                    clicked = True
-                    break
-            except Exception:
-                try:
                     await btn.click()
                     clicked = True
                     break
-                except Exception:
-                    continue
+            except Exception:
+                continue
 
         if not clicked:
             logger.warning("Could not find reply button for comment %d", comment_index)
-            await page.screenshot(path=str(SCREENSHOTS_DIR / f"no_reply_btn_{comment_index}.png"))
+            await _safe_screenshot(page, f"no_reply_btn_{comment_index}.png")
             return False
 
         await human_delay(1.0, 2.0)
 
-        # SELECTOR: reply text input
+        # Reply text input
         reply_input_selectors = [
             '[data-testid="reply-input"]',
-            'textarea[placeholder*="reply"]',
-            'textarea[placeholder*="Reply"]',
+            'textarea[placeholder*="reply" i]',
             '.reply-input textarea',
             'div[contenteditable="true"]',
             'textarea[class*="reply"]',
@@ -75,18 +86,17 @@ async def reply_to_comment(
 
         if not typed:
             logger.warning("Could not find reply input field for comment %d", comment_index)
-            await page.screenshot(path=str(SCREENSHOTS_DIR / f"no_reply_input_{comment_index}.png"))
+            await _safe_screenshot(page, f"no_reply_input_{comment_index}.png")
             return False
 
         await human_delay(1.0, 2.0)
 
-        # SELECTOR: submit reply button
+        # Submit reply button
         submit_selectors = [
             'button:has-text("Post")',
             'button:has-text("Submit")',
             '[data-testid="submit-reply"]',
             'button[type="submit"]',
-            'button[class*="submit"]',
         ]
         submitted = False
         for submit_sel in submit_selectors:
@@ -101,7 +111,7 @@ async def reply_to_comment(
 
         if not submitted:
             logger.warning("Could not find submit button for reply")
-            await page.screenshot(path=str(SCREENSHOTS_DIR / f"no_submit_btn_{comment_index}.png"))
+            await _safe_screenshot(page, f"no_submit_btn_{comment_index}.png")
             return False
 
         await human_delay(2.0, 4.0)
@@ -110,10 +120,7 @@ async def reply_to_comment(
 
     except Exception as e:
         logger.error("Error replying to comment %d: %s", comment_index, e)
-        try:
-            await page.screenshot(path=str(SCREENSHOTS_DIR / f"reply_error_{comment_index}.png"))
-        except Exception:
-            pass
+        await _safe_screenshot(page, f"reply_error_{comment_index}.png")
         return False
 
 
@@ -121,22 +128,18 @@ async def post_new_comment(page: Page, ticker: str, text: str) -> bool:
     """Post a brand-new comment on the community page."""
     try:
         if "community" not in page.url.lower():
-            await page.goto(
-                f"https://ca.finance.yahoo.com/quote/{ticker}/community",
-                wait_until="commit",
-                timeout=120000,
-            )
+            url = f"https://finance.yahoo.com/quote/{ticker}/community"
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
             await human_delay(4.0, 6.0)
 
-        # SELECTOR: main comment input
+        # Main comment input — le champ "What's on your mind?"
         comment_input_selectors = [
             '[data-testid="comment-input"]',
-            'textarea[placeholder*="comment"]',
-            'textarea[placeholder*="Comment"]',
-            'textarea[placeholder*="Share your thoughts"]',
-            'div[data-placeholder*="comment"]',
+            'textarea[placeholder*="mind" i]',
+            'textarea[placeholder*="comment" i]',
+            'textarea[placeholder*="Share" i]',
+            'div[data-placeholder*="mind" i]',
             'div[contenteditable="true"]',
-            '.comment-input textarea',
         ]
         typed = False
         for input_sel in comment_input_selectors:
@@ -153,18 +156,20 @@ async def post_new_comment(page: Page, ticker: str, text: str) -> bool:
 
         if not typed:
             logger.warning("Could not find comment input field")
-            await page.screenshot(path=str(SCREENSHOTS_DIR / "no_comment_input.png"))
+            await _safe_screenshot(page, "no_comment_input.png")
             return False
 
         await human_delay(1.5, 3.0)
 
-        # SELECTOR: submit button
+        # Submit button (la flèche ou bouton "Post")
         submit_selectors = [
+            'button[data-testid="submit-comment"]',
             'button:has-text("Post")',
-            'button:has-text("Comment")',
             'button:has-text("Submit")',
-            '[data-testid="submit-comment"]',
             'button[type="submit"]',
+            # La flèche d'envoi visible sur le screenshot
+            'button[aria-label*="send" i]',
+            'button[aria-label*="post" i]',
         ]
         submitted = False
         for submit_sel in submit_selectors:
@@ -179,7 +184,7 @@ async def post_new_comment(page: Page, ticker: str, text: str) -> bool:
 
         if not submitted:
             logger.warning("Could not find submit button for new comment")
-            await page.screenshot(path=str(SCREENSHOTS_DIR / "no_comment_submit.png"))
+            await _safe_screenshot(page, "no_comment_submit.png")
             return False
 
         await human_delay(2.0, 4.0)
@@ -188,8 +193,5 @@ async def post_new_comment(page: Page, ticker: str, text: str) -> bool:
 
     except Exception as e:
         logger.error("Error posting new comment: %s", e)
-        try:
-            await page.screenshot(path=str(SCREENSHOTS_DIR / "post_error.png"))
-        except Exception:
-            pass
+        await _safe_screenshot(page, "post_error.png")
         return False

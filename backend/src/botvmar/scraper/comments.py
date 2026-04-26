@@ -14,8 +14,13 @@ from botvmar.utils.logger import get_logger
 
 logger = get_logger("scraper")
 
-# Sélecteur stable d'un post community (Yahoo 2026).
-POST_SELECTOR = '[data-testid="content-card-preview"]'
+# Sélecteurs possibles pour un post community (Yahoo change le markup).
+POST_SELECTORS = [
+    '[data-testid="content-card-preview"]',
+    '[data-testid="post-card"]',
+    '.comment-stream-card',
+    'article[data-testid]',
+]
 
 _UUID_FROM_URL = re.compile(r"/post/([0-9a-f-]{8,})/?", re.IGNORECASE)
 
@@ -26,21 +31,25 @@ def _generate_comment_id(author: str, text: str) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 
-async def scrape_comments(page: Page, ticker: str) -> list[dict]:
-    """Scrape les posts visibles sur la page community Yahoo Finance.
+async def _navigate_to_community(page: Page, ticker: str) -> str | None:
+    """Try multiple Yahoo Finance community URLs, return the working post selector or None."""
+    urls = [
+        f"https://finance.yahoo.com/quote/{ticker}/community",
+        f"https://ca.finance.yahoo.com/quote/{ticker}/community",
+    ]
 
-    Yahoo a migré vers un format "post" (style fil social) ; on conserve la
-    nomenclature "comment" en interne pour ne pas casser le reste du code.
-    """
-    url = f"https://ca.finance.yahoo.com/quote/{ticker}/community"
-    logger.info("Navigating to %s", url)
+    for url_idx, url in enumerate(urls):
+        logger.info("Navigating to %s (attempt %d/%d)", url, url_idx + 1, len(urls))
 
-    try:
-        await page.goto(url, wait_until="commit", timeout=120000)
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+        except Exception as nav_err:
+            logger.warning("Navigation failed for %s: %s", url, nav_err)
+            if url_idx < len(urls) - 1:
+                continue
+            return None
 
-        # La community page est rendue en CSR (Svelte) : le HTML SSR n'a pas les
-        # posts, ils sont chargés via XHR après hydratation. On attend que le
-        # réseau se stabilise pour laisser l'API community répondre.
+        # Attendre que le réseau se stabilise (CSR/Svelte hydratation)
         try:
             await page.wait_for_load_state("networkidle", timeout=30000)
         except Exception:
@@ -48,7 +57,7 @@ async def scrape_comments(page: Page, ticker: str) -> list[dict]:
 
         await human_delay(2.0, 4.0)
 
-        # Cookie / consent banner (rare au Canada, mais possible)
+        # Cookie / consent banner
         try:
             consent_btn = page.locator(
                 'button[name="agree"], [data-testid="consent-accept"]'
@@ -59,22 +68,47 @@ async def scrape_comments(page: Page, ticker: str) -> list[dict]:
         except Exception:
             pass
 
-        # Petit scroll : peut déclencher le lazy-load de l'app Svelte
-        try:
-            await page.evaluate("window.scrollBy(0, 400)")
-        except Exception:
-            pass
+        # Scrolls progressifs pour déclencher le lazy-load Svelte
+        for scroll_px in (300, 400, 500):
+            try:
+                await page.evaluate(f"window.scrollBy(0, {scroll_px})")
+                await human_delay(1.0, 2.0)
+            except Exception:
+                pass
 
-        # Attendre qu'au moins un post soit présent dans le DOM (45s : le fetch
-        # GraphQL côté Yahoo prend parfois 20-30s en headless).
-        try:
-            await page.wait_for_selector(POST_SELECTOR, timeout=45000)
-        except Exception:
-            logger.warning("No post found after 45s — Yahoo may serve a CSR-only shell or block headless")
-            await page.screenshot(
-                path=str(SCREENSHOTS_DIR / "no_comments_container.png"),
-                full_page=True,
-            )
+        # Attendre qu'au moins un post soit présent dans le DOM
+        for sel in POST_SELECTORS:
+            try:
+                await page.wait_for_selector(sel, timeout=20000)
+                logger.info("Posts found with selector: %s", sel)
+                return sel
+            except Exception:
+                continue
+
+        logger.warning("No post found after trying all selectors on %s", url)
+
+    return None
+
+
+async def scrape_comments(page: Page, ticker: str) -> list[dict]:
+    """Scrape les posts visibles sur la page community Yahoo Finance.
+
+    Yahoo a migré vers un format "post" (style fil social) ; on conserve la
+    nomenclature "comment" en interne pour ne pas casser le reste du code.
+    """
+    try:
+        active_selector = await _navigate_to_community(page, ticker)
+
+        if active_selector is None:
+            logger.warning("Could not find any posts — saving debug info")
+            try:
+                await page.screenshot(
+                    path=str(SCREENSHOTS_DIR / "no_comments_container.png"),
+                    full_page=True,
+                    timeout=10000,
+                )
+            except Exception:
+                pass
             try:
                 html = await page.content()
                 (SCREENSHOTS_DIR / "no_comments_container.html").write_text(
@@ -90,7 +124,7 @@ async def scrape_comments(page: Page, ticker: str) -> list[dict]:
             await human_delay(1.5, 3.0)
             logger.debug("Scroll %d/4 done", i + 1)
 
-        posts = page.locator(POST_SELECTOR)
+        posts = page.locator(active_selector)
         count = await posts.count()
         logger.info("Found %d posts on page", count)
 
@@ -181,7 +215,7 @@ async def scrape_comments(page: Page, ticker: str) -> list[dict]:
                     "dislikes": 0,  # Yahoo n'a plus de dislike sur les posts
                     "comment_count": comment_count,
                     "element_index": i,
-                    "_selector": POST_SELECTOR,
+                    "_selector": active_selector,
                 })
             except Exception as e:
                 logger.debug("Error parsing post %d: %s", i, e)
@@ -193,7 +227,10 @@ async def scrape_comments(page: Page, ticker: str) -> list[dict]:
     except Exception as e:
         logger.error("Error scraping community page: %s", e)
         try:
-            await page.screenshot(path=str(SCREENSHOTS_DIR / "scrape_error.png"))
+            await page.screenshot(
+                path=str(SCREENSHOTS_DIR / "scrape_error.png"),
+                timeout=10000,
+            )
         except Exception:
             pass
         return []

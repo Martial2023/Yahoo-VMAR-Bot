@@ -34,6 +34,7 @@ def _get_client() -> AsyncOpenAI:
 async def _call_ai(system: str, user_message: str, max_retries: int = 3) -> str | None:
     client = _get_client()
     settings = await runtime.get()
+    print(f"Calling AI with model {settings.ai_model} and temperature {settings.ai_temperature}")  # debug
 
     for attempt in range(1, max_retries + 1):
         try:
@@ -47,20 +48,23 @@ async def _call_ai(system: str, user_message: str, max_retries: int = 3) -> str 
                 ],
             )
             text = (response.choices[0].message.content or "").strip()
+            if not text:
+                logger.warning("AI returned empty response (attempt %d, model %s)", attempt, settings.ai_model)
+                continue
             logger.info("AI response generated (%d chars, attempt %d, model %s)", len(text), attempt, settings.ai_model)
             return text
         except Exception as e:
             error_str = str(e)
+            logger.error("AI call failed (attempt %d/%d, model %s): %s", attempt, max_retries, settings.ai_model, e)
             # Erreurs d'auth/permission : inutile de retry, c'est définitif.
             if any(code in error_str for code in ("401", "403", "User not found", "Invalid API")):
-                logger.error("AI auth error — check OPENROUTER_KEY: %s", e)
+                logger.error("AI auth error — check OPENROUTER_KEY")
                 return None
             if "rate" in error_str.lower() or "429" in error_str:
                 wait = 2 ** attempt * 5
-                logger.warning("Rate limited (attempt %d/%d), waiting %ds: %s", attempt, max_retries, wait, e)
+                logger.warning("Rate limited, waiting %ds before retry", wait)
                 await asyncio.sleep(wait)
             else:
-                logger.error("API error (attempt %d/%d): %s", attempt, max_retries, e)
                 if attempt < max_retries:
                     await asyncio.sleep(2 ** attempt)
 

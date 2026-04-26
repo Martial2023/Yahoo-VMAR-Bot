@@ -78,11 +78,10 @@ async def run_cycle(triggered_by: str = "schedule", shutdown_flag=lambda: False)
             metadata={"count": len(all_comments)},
         )
 
-        if not all_comments:
-            return
-
-        new_comments = await filter_new(all_comments)
-        logger.info("New comments to process: %d", len(new_comments))
+        new_comments: list[dict] = []
+        if all_comments:
+            new_comments = await filter_new(all_comments)
+            logger.info("New comments to process: %d", len(new_comments))
 
         # --- REPLIES ---
         if settings.mode in ("reply", "both") and new_comments:
