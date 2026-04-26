@@ -13,9 +13,9 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Paramètres du bot</h1>
+        <h1 className="text-2xl font-semibold">Bot Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Modifications appliquées au prochain cycle (ou immédiatement via le backend)
+          Changes applied to the next cycle (or immediately via the backend)
         </p>
       </div>
       <SettingsForm

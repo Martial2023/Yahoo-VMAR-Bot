@@ -68,9 +68,9 @@ export default async function ActivitiesPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Activités</h1>
+        <h1 className="text-2xl font-semibold">Activities</h1>
         <p className="text-sm text-muted-foreground">
-          {total} événement{total > 1 ? "s" : ""} — page {page} / {totalPages}
+          {total} event{total > 1 ? "s" : ""} — page {page} / {totalPages}
         </p>
       </div>
 
@@ -111,7 +111,7 @@ export default async function ActivitiesPage({
             <TableRow>
               <TableHead className="w-[170px]">Date</TableHead>
               <TableHead className="w-[100px]">Type</TableHead>
-              <TableHead className="w-[110px]">Statut</TableHead>
+              <TableHead className="w-[110px]">Status</TableHead>
               <TableHead>Contenu / erreur</TableHead>
               <TableHead className="w-[160px]">Comment ID</TableHead>
             </TableRow>
@@ -120,7 +120,7 @@ export default async function ActivitiesPage({
             {items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                  Aucune activité pour ces filtres.
+                    No activities found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
@@ -147,13 +147,13 @@ export default async function ActivitiesPage({
 
       <div className="flex items-center justify-between">
         <Button asChild variant="outline" disabled={page <= 1}>
-          <Link href={pageHref(Math.max(1, page - 1))}>Précédent</Link>
+          <Link href={pageHref(Math.max(1, page - 1))}>Previous</Link>
         </Button>
         <p className="text-sm text-muted-foreground">
           Page {page} / {totalPages}
         </p>
         <Button asChild variant="outline" disabled={page >= totalPages}>
-          <Link href={pageHref(Math.min(totalPages, page + 1))}>Suivant</Link>
+          <Link href={pageHref(Math.min(totalPages, page + 1))}>Next</Link>
         </Button>
       </div>
     </div>

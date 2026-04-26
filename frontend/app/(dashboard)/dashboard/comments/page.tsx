@@ -40,9 +40,9 @@ export default async function CommentsPage({
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold">Commentaires vus</h1>
+        <h1 className="text-2xl font-semibold">Comments seen</h1>
         <p className="text-sm text-muted-foreground">
-          {total} commentaire{total > 1 ? "s" : ""} traité{total > 1 ? "s" : ""} — page {page} / {totalPages}
+          {total} comment{total > 1 ? "s" : ""} processed — page {page} / {totalPages}
         </p>
       </div>
 
@@ -50,9 +50,9 @@ export default async function CommentsPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[170px]">Vu le</TableHead>
-              <TableHead className="w-[150px]">Auteur</TableHead>
-              <TableHead>Contenu</TableHead>
+              <TableHead className="w-[170px]">Seen at</TableHead>
+              <TableHead className="w-[150px]">Author</TableHead>
+              <TableHead>Content</TableHead>
               <TableHead className="w-[140px]">ID</TableHead>
             </TableRow>
           </TableHeader>
@@ -60,7 +60,7 @@ export default async function CommentsPage({
             {items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                  Aucun commentaire scrappé pour le moment.
+                  No comments found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
@@ -84,13 +84,13 @@ export default async function CommentsPage({
 
       <div className="flex items-center justify-between">
         <Button asChild variant="outline" disabled={page <= 1}>
-          <Link href={`/dashboard/comments?page=${Math.max(1, page - 1)}`}>Précédent</Link>
+          <Link href={`/dashboard/comments?page=${Math.max(1, page - 1)}`}>Previous</Link>
         </Button>
         <p className="text-sm text-muted-foreground">
           Page {page} / {totalPages}
         </p>
         <Button asChild variant="outline" disabled={page >= totalPages}>
-          <Link href={`/dashboard/comments?page=${Math.min(totalPages, page + 1)}`}>Suivant</Link>
+          <Link href={`/dashboard/comments?page=${Math.min(totalPages, page + 1)}`}>Next</Link>
         </Button>
       </div>
     </div>

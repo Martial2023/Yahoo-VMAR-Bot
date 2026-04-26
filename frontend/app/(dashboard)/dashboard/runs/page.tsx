@@ -81,7 +81,7 @@ export default async function RunsPage({
             {items.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                  Aucun cycle exécuté.
+                  No cycles found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
@@ -107,13 +107,13 @@ export default async function RunsPage({
 
       <div className="flex items-center justify-between">
         <Button asChild variant="outline" disabled={page <= 1}>
-          <Link href={`/dashboard/runs?page=${Math.max(1, page - 1)}`}>Précédent</Link>
+          <Link href={`/dashboard/runs?page=${Math.max(1, page - 1)}`}>Previous</Link>
         </Button>
         <p className="text-sm text-muted-foreground">
           Page {page} / {totalPages}
         </p>
         <Button asChild variant="outline" disabled={page >= totalPages}>
-          <Link href={`/dashboard/runs?page=${Math.min(totalPages, page + 1)}`}>Suivant</Link>
+          <Link href={`/dashboard/runs?page=${Math.min(totalPages, page + 1)}`}>Next</Link>
         </Button>
       </div>
     </div>
