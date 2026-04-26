@@ -33,6 +33,9 @@ python -m pip install --upgrade pip wheel >/dev/null
 log "Python dependencies"
 pip install -r requirements.txt
 
+log "Installing botvmar package (editable)"
+pip install -e .
+
 log "Playwright Chromium + system deps"
 python -m playwright install chromium --with-deps
 

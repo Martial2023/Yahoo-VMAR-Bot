@@ -1,9 +1,3 @@
-"""Notifications — Telegram (sync) and email via SMTP (async).
-
-Email recipients come from runtime settings (`alert_emails`); SMTP credentials
-come from .env. Telegram remains as an optional second channel.
-"""
-
 from __future__ import annotations
 
 from email.message import EmailMessage

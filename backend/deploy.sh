@@ -27,6 +27,10 @@ source .venv/bin/activate
 python -m pip install --upgrade pip wheel >/dev/null
 pip install --upgrade -r requirements.txt
 
+# Réinstalle le package en editable (no-op si déjà à jour, mais pris en compte
+# si pyproject.toml a changé — nouvelle dépendance, version, etc.).
+pip install -e .
+
 log "Ensuring Playwright Chromium is installed"
 python -m playwright install chromium >/dev/null 2>&1 || true
 
