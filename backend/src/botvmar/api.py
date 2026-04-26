@@ -40,7 +40,7 @@ class SimpleResponse(BaseModel):
 async def health() -> dict:
     return {
         "status": "ok",
-        "message": "BotVMAR API is running",
+        "message": "BotVMAR API is running 2",
     }
 
 
