@@ -72,12 +72,19 @@ model Verification {
 }
 
 
+// ----------------------------------------------------------------------------
+// Global bot settings (shared across all platforms)
+// ----------------------------------------------------------------------------
+//
+// Per-platform settings (mode, quotas, prompts, schedule, credentials) live in
+// `PlatformSettings`. This singleton row only holds values that genuinely
+// apply to the entire system (AI model, alert recipients, master kill switch).
 
 model BotSettings {
   id                Int      @id @default(1)
   botEnabled        Boolean  @default(true)                                @map("bot_enabled")
-  mode              String   @default("both")                              // "reply" | "post" | "both"
-  ticker            String   @default("VMAR")
+  mode              String   @default("both")                              // legacy — superseded by PlatformSettings
+  ticker            String   @default("VMAR")                              // default ticker if a platform doesn't override
   checkIntervalMin  Int      @default(120)                                 @map("check_interval_min")
   checkIntervalMax  Int      @default(300)                                 @map("check_interval_max")
   maxRepliesPerHour Int      @default(5)                                   @map("max_replies_per_hour")
@@ -92,18 +99,95 @@ model BotSettings {
   @@map("bot_settings")
 }
 
+
+// ----------------------------------------------------------------------------
+// Per-platform configuration
+// ----------------------------------------------------------------------------
+//
+// One row per supported platform (yahoo_finance, reddit, stocktwits, ...).
+// The orchestrator iterates every row where `enabled = true` at cycle start.
+//
+// `mode` controls operational safety:
+//   - "test"       → only reply to authors listed in WhitelistedAuthor
+//   - "production" → reply to anyone (subject to platform skip rules)
+//
+// `scheduleSlots` is a list of "HH:MM" strings (server timezone). The worker
+// fires a cycle within ±`scheduleJitterMin` minutes of each slot.
+//
+// `credentials` and `config` are JSONB so each platform can store whatever
+// it needs (Reddit OAuth tokens, list of subreddits, StockTwits API key, ...)
+// without requiring schema changes per platform.
+
+model PlatformSettings {
+  id                Int      @id @default(autoincrement())
+  platform          String   @unique                                       // "yahoo_finance" | "reddit" | ...
+  displayName       String                                                 @map("display_name")
+  enabled           Boolean  @default(false)
+  mode              String   @default("test")                              // "test" | "production"
+  replyEnabled      Boolean  @default(true)                                @map("reply_enabled")
+  postEnabled       Boolean  @default(true)                                @map("post_enabled")
+  ticker            String   @default("VMAR")
+  maxRepliesPerDay  Int      @default(10)                                  @map("max_replies_per_day")
+  maxPostsPerDay    Int      @default(2)                                   @map("max_posts_per_day")
+  minPostLength     Int      @default(20)                                  @map("min_post_length")
+  scheduleSlots     String[] @default([])                                  @map("schedule_slots")     // ["09:00","14:00","19:00"]
+  scheduleJitterMin Int      @default(10)                                  @map("schedule_jitter_min")
+  replyPrompt       String?  @db.Text                                      @map("reply_prompt")        // null → fallback to BotSettings
+  postPrompt        String?  @db.Text                                      @map("post_prompt")         // null → fallback to BotSettings
+  credentials       Json?                                                                              // OAuth tokens, API keys
+  config            Json?                                                                              // platform-specific (subreddits, ...)
+  createdAt         DateTime @default(now())                               @map("created_at")
+  updatedAt         DateTime @updatedAt                                    @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+
+// ----------------------------------------------------------------------------
+// Whitelist of authors the bot is allowed to reply to in test mode
+// ----------------------------------------------------------------------------
+//
+// When PlatformSettings.mode = "test", the orchestrator only generates a reply
+// if the post's author is listed here for the same platform.
+
+model WhitelistedAuthor {
+  id           BigInt   @id @default(autoincrement())
+  platform     String
+  authorHandle String                                                       @map("author_handle")
+  note         String?
+  createdAt    DateTime @default(now())                                     @map("created_at")
+
+  @@unique([platform, authorHandle])
+  @@index([platform])
+  @@map("whitelisted_authors")
+}
+
+
+// ----------------------------------------------------------------------------
+// Already-processed posts (per platform)
+// ----------------------------------------------------------------------------
+
 model SeenComment {
   id        String   @id
+  platform  String   @default("yahoo_finance")
   author    String
   content   String   @db.Text
   scrapedAt DateTime @default(now()) @map("scraped_at")
 
+  @@index([platform])
+  @@index([platform, scrapedAt])
   @@map("seen_comments")
 }
+
+
+// ----------------------------------------------------------------------------
+// Per-action audit trail (drives the dashboard activity feed)
+// ----------------------------------------------------------------------------
 
 model BotActivity {
   id        BigInt   @id @default(autoincrement())
   runId     String?  @map("run_id")                  // FK logique -> bot_runs.id, pas contraint
+  platform  String?  @default("yahoo_finance")       // null pour évenements globaux (ex: process startup)
   type      String                                    // "scrape" | "reply" | "post" | "login" | "session" | "error"
   status    String                                    // "success" | "failed" | "skipped"
   commentId String?  @map("comment_id")
@@ -115,11 +199,18 @@ model BotActivity {
   @@index([createdAt])
   @@index([type, status])
   @@index([runId])
+  @@index([platform, createdAt])
   @@map("bot_activities")
 }
 
+
+// ----------------------------------------------------------------------------
+// Per-cycle summary (one row per cycle per platform)
+// ----------------------------------------------------------------------------
+
 model BotRun {
   id              String    @id
+  platform        String    @default("yahoo_finance")
   startedAt       DateTime  @default(now()) @map("started_at")
   endedAt         DateTime? @map("ended_at")
   status          String    @default("running")                       // "running" | "success" | "failed"
@@ -130,5 +221,6 @@ model BotRun {
   triggeredBy     String    @default("schedule") @map("triggered_by") // "schedule" | "manual"
 
   @@index([startedAt])
+  @@index([platform, startedAt])
   @@map("bot_runs")
 }

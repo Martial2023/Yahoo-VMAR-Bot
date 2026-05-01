@@ -31,11 +31,15 @@ class RuntimeSettings:
 
 
 _cache: RuntimeSettings | None = None
+# Snapshot of (mode, ticker, bot_enabled) we last INFO-logged. The worker
+# reloads settings on every tick; logging a fresh INFO line each time is
+# noise, so we downgrade to DEBUG when nothing observable changed.
+_last_logged: tuple[str, str, bool] | None = None
 
 
 async def load() -> RuntimeSettings:
     """Force-reload settings from Postgres and update the cache."""
-    global _cache
+    global _cache, _last_logged
     row = await settings_repo.get_settings()
     _cache = RuntimeSettings(
         bot_enabled=row["bot_enabled"],
@@ -51,10 +55,15 @@ async def load() -> RuntimeSettings:
         post_prompt=row["post_prompt"],
         alert_emails=list(row["alert_emails"] or []),
     )
-    logger.info(
-        "Runtime settings loaded — mode=%s ticker=%s enabled=%s",
-        _cache.mode, _cache.ticker, _cache.bot_enabled,
-    )
+    snapshot = (_cache.mode, _cache.ticker, _cache.bot_enabled)
+    if snapshot != _last_logged:
+        logger.info(
+            "Runtime settings changed — mode=%s ticker=%s enabled=%s",
+            _cache.mode, _cache.ticker, _cache.bot_enabled,
+        )
+        _last_logged = snapshot
+    else:
+        logger.debug("Runtime settings reloaded (unchanged)")
     return _cache
 
 

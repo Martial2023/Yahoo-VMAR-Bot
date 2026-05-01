@@ -16,6 +16,7 @@ import {
   ListChecksIcon,
   MessageSquareIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   TrendingUp,
 } from "lucide-react";
 import { NavMain } from "./nav-main";
@@ -27,6 +28,7 @@ const navMain = [
   { title: "Activities", url: "/dashboard/activities", icon: <ActivityIcon /> },
   { title: "Cycles", url: "/dashboard/runs", icon: <ListChecksIcon /> },
   { title: "Comments", url: "/dashboard/comments", icon: <MessageSquareIcon /> },
+  { title: "Whitelist", url: "/dashboard/whitelist", icon: <ShieldCheckIcon /> },
   { title: "Settings", url: "/dashboard/settings", icon: <SettingsIcon /> },
 ];
 

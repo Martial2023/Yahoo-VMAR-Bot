@@ -1,6 +1,12 @@
-"""Asyncpg connection pool — single shared instance for the whole process."""
+"""Asyncpg connection pool — single shared instance for the whole process.
+
+Every connection registers a JSON/JSONB codec so columns of those types are
+returned as Python dict/list directly (asyncpg's default returns raw text).
+"""
 
 from __future__ import annotations
+
+import json
 
 import asyncpg
 
@@ -10,6 +16,24 @@ from botvmar.utils.logger import get_logger
 logger = get_logger("db.pool")
 
 _pool: asyncpg.Pool | None = None
+
+
+async def _register_json_codecs(conn: asyncpg.Connection) -> None:
+    """Auto-decode JSON/JSONB columns to Python objects on every connection."""
+    await conn.set_type_codec(
+        "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+        format="text",
+    )
+    await conn.set_type_codec(
+        "json",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
+        format="text",
+    )
 
 
 async def init_pool(min_size: int = 1, max_size: int = 10) -> asyncpg.Pool:
@@ -24,6 +48,7 @@ async def init_pool(min_size: int = 1, max_size: int = 10) -> asyncpg.Pool:
         min_size=min_size,
         max_size=max_size,
         command_timeout=30,
+        init=_register_json_codecs,
     )
     logger.info("Postgres pool initialized (min=%d max=%d)", min_size, max_size)
     return _pool

@@ -33,12 +33,22 @@ async function call<T = Json>(
   return text ? (JSON.parse(text) as T) : ({} as T);
 }
 
+export type BackendPlatformStatus = {
+  platform: string;
+  display_name: string;
+  enabled: boolean;
+  mode: string;
+  schedule_slots: string[];
+};
+
 export type BackendStatus = {
   bot_enabled: boolean;
   mode: string;
   ticker: string;
   trigger_pending: boolean;
   shutdown_requested: boolean;
+  enabled_platforms?: BackendPlatformStatus[];
+  known_platforms?: string[];
 };
 
 export async function getBackendHealth(): Promise<{ status: string } | null> {
@@ -63,6 +73,12 @@ export async function getBackendStatus(): Promise<BackendStatus | null> {
 
 export async function triggerCycle(): Promise<{ ok: boolean; detail?: string }> {
   return call("/trigger-cycle", { method: "POST" });
+}
+
+export async function triggerPlatformCycle(
+  platform: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  return call(`/trigger-cycle/${encodeURIComponent(platform)}`, { method: "POST" });
 }
 
 export async function reloadConfig(): Promise<{ ok: boolean; detail?: string }> {

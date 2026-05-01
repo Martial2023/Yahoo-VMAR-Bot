@@ -43,3 +43,4 @@ desktop.ini
 
 # --- Claude Code local config ---
 .claude/settings.local.json
+*.mp4

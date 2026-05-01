@@ -1,4 +1,8 @@
-"""Yahoo Finance session — launch browser, save/restore storage state, validate."""
+"""Browser session — launch browser, save/restore storage state, validate.
+
+Supports multiple platforms via `create_browser_for(platform_key)`.  Each
+platform stores its cookies in `sessions/<key>_session.json`.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ from pathlib import Path
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
 from botvmar.browser.stealth import apply_stealth, get_random_user_agent, human_delay
-from botvmar.config.env import PROJECT_ROOT, PROXY_URL, SCREENSHOTS_DIR, SESSION_FILE
+from botvmar.config.env import PROJECT_ROOT, PROXY_URL, SCREENSHOTS_DIR, SESSION_FILE, SESSIONS_DIR
 from botvmar.utils.logger import get_logger
 from botvmar.utils.notifier import notify
 
@@ -17,6 +21,11 @@ logger = get_logger("session")
 
 def _session_path() -> Path:
     return PROJECT_ROOT / SESSION_FILE
+
+
+def _session_path_for(platform_key: str) -> Path:
+    """Return the session file path for a given platform key."""
+    return SESSIONS_DIR / f"{platform_key}_session.json"
 
 
 async def create_browser(headless: bool = True) -> tuple:
@@ -49,6 +58,54 @@ async def create_browser(headless: bool = True) -> tuple:
         logger.info("Loading saved session from %s", sp)
     else:
         logger.warning("No saved session found — bot will not be logged in")
+
+    context = await browser.new_context(**context_args)
+    await apply_stealth(context)
+    page = await context.new_page()
+    return pw, browser, context, page
+
+
+async def create_browser_for(
+    platform_key: str,
+    *,
+    headless: bool = True,
+) -> tuple:
+    """Launch Chromium with stealth + saved session for `platform_key`.
+
+    Session file: ``sessions/{platform_key}_session.json``.
+    Falls back to `create_browser` semantics (no storage_state) when the file
+    doesn't exist yet.
+    """
+    pw = await async_playwright().start()
+
+    launch_args: dict = {
+        "headless": headless,
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+        ],
+    }
+    if PROXY_URL:
+        launch_args["proxy"] = {"server": PROXY_URL}
+
+    browser = await pw.chromium.launch(**launch_args)
+
+    context_args: dict = {
+        "user_agent": get_random_user_agent(),
+        "viewport": {"width": 1920, "height": 1080},
+        "locale": "en-US",
+        "timezone_id": "America/New_York",
+    }
+    sp = _session_path_for(platform_key)
+    if sp.exists():
+        context_args["storage_state"] = str(sp)
+        logger.info("[%s] Loading saved session from %s", platform_key, sp)
+    else:
+        logger.warning(
+            "[%s] No saved session at %s — bot will not be logged in",
+            platform_key, sp,
+        )
 
     context = await browser.new_context(**context_args)
     await apply_stealth(context)

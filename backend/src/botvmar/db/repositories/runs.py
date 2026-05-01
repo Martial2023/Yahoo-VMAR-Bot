@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from datetime import datetime
 
 from botvmar.db.pool import get_pool
 
@@ -11,7 +12,17 @@ def _new_id() -> str:
     return secrets.token_urlsafe(12)
 
 
-async def start(triggered_by: str = "schedule") -> str:
+async def last_started_at(platform: str) -> datetime | None:
+    """Most recent `started_at` for `platform`, or None when no run yet."""
+    pool = get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(
+            "SELECT MAX(started_at) FROM bot_runs WHERE platform = $1",
+            platform,
+        )
+
+
+async def start(triggered_by: str = "schedule", platform: str = "yahoo_finance") -> str:
     """Open a new run row and return its id."""
     run_id = _new_id()
     pool = get_pool()
@@ -19,11 +30,11 @@ async def start(triggered_by: str = "schedule") -> str:
         await conn.execute(
             """
             INSERT INTO bot_runs
-              (id, started_at, status, comments_scraped, replies_posted,
+              (id, platform, started_at, status, comments_scraped, replies_posted,
                posts_published, errors_count, triggered_by)
-            VALUES ($1, NOW(), 'running', 0, 0, 0, 0, $2)
+            VALUES ($1, $2, NOW(), 'running', 0, 0, 0, 0, $3)
             """,
-            run_id, triggered_by,
+            run_id, platform, triggered_by,
         )
     return run_id
 

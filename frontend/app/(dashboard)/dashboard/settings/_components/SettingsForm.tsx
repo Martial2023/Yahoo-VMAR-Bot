@@ -10,13 +10,16 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { updateBotSettings, type SettingsInput } from "@/app/(actions)/actions";
+import { AI_MODELS, AI_PROVIDERS, findModelByOpenrouterId } from "@/lib/ai-models";
 
 type Props = {
   initial: SettingsInput;
@@ -86,7 +89,28 @@ export default function SettingsForm({ initial }: Props) {
 
         <div className="grid gap-2">
           <Label>AI Model (OpenRouter)</Label>
-          <Input value={form.aiModel} onChange={(e) => field("aiModel", e.target.value)} />
+          <Select
+            value={form.aiModel}
+            onValueChange={(v) => field("aiModel", v)}
+          >
+            <SelectTrigger className="w-full cursor-pointer">
+              <SelectValue placeholder="Select a model">
+                {findModelByOpenrouterId(form.aiModel)?.name ?? form.aiModel}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {AI_PROVIDERS.map((provider) => (
+                <SelectGroup key={provider}>
+                  <SelectLabel>{provider}</SelectLabel>
+                  {AI_MODELS.filter((m) => m.provider === provider).map((m) => (
+                    <SelectItem key={m.id} value={m.openrouterId}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-2">
@@ -157,6 +181,7 @@ export default function SettingsForm({ initial }: Props) {
           rows={10}
           value={form.replyPrompt}
           onChange={(e) => field("replyPrompt", e.target.value)}
+          className="max-h-48 overflow-y-auto"
         />
       </div>
 
@@ -166,6 +191,7 @@ export default function SettingsForm({ initial }: Props) {
           rows={10}
           value={form.postPrompt}
           onChange={(e) => field("postPrompt", e.target.value)}
+          className="max-h-48 overflow-y-auto"
         />
       </div>
 
