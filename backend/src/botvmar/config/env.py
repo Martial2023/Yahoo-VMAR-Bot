@@ -17,7 +17,7 @@ load_dotenv(_env_path)
 
 DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
-# --- API control ---
+
 API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
 API_PORT: int = int(os.getenv("API_PORT", "8000"))
 API_TOKEN: str = os.getenv("API_TOKEN", "")
@@ -28,7 +28,7 @@ YAHOO_EMAIL: str = os.getenv("YAHOO_EMAIL", "")
 YAHOO_PASSWORD: str = os.getenv("YAHOO_PASSWORD", "")
 PROXY_URL: str = os.getenv("PROXY_URL", "")
 
-# --- Reddit (script-type app — https://www.reddit.com/prefs/apps) ---
+
 REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID", "")
 REDDIT_CLIENT_SECRET: str = os.getenv("REDDIT_CLIENT_SECRET", "")
 REDDIT_USERNAME: str = os.getenv("REDDIT_USERNAME", "")
@@ -51,8 +51,7 @@ TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
 
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
-# Run a full cycle for all enabled platforms as soon as the worker starts.
-RUN_ON_STARTUP: bool = os.getenv("RUN_ON_STARTUP", "true").strip().lower() in ("1", "true", "yes")
+RUN_ON_STARTUP: bool = os.getenv("RUN_ON_STARTUP", "false").strip().lower() in ("1", "true", "yes")
 
 
 PROJECT_ROOT: Path = _pkg_root

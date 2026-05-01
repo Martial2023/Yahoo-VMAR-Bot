@@ -37,8 +37,6 @@ from botvmar.utils.notifier import notify
 
 logger = get_logger("worker")
 
-# How often the scheduler wakes up to evaluate slots. 30 seconds gives a
-# generous buffer for any slot whose jitter window is at least 1 minute.
 _TICK_SECONDS = 30
 
 
