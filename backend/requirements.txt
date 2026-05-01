@@ -10,5 +10,3 @@ uvicorn[standard]>=0.32.0
 pydantic>=2.9.0
 aiosmtplib>=3.0.2
 asyncpraw>=7.7.1
-pywin32
-cryptography
