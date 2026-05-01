@@ -36,8 +36,9 @@ pip install -r requirements.txt
 log "Installing botvmar package (editable)"
 pip install -e .
 
-log "Playwright Chromium + system deps"
+log "Playwright browsers + system deps"
 python -m playwright install chromium --with-deps
+python -m playwright install firefox --with-deps
 
 log "Runtime directories"
 mkdir -p data logs/screenshots sessions
@@ -74,8 +75,10 @@ Prochaines étapes :
   1. Édite le .env :
      nano .env
 
-  2. (Premier déploiement) Login Yahoo manuel :
-     xvfb-run python scripts/login.py
+  2. Login plateformes (sessions manuelles, une seule fois) :
+     xvfb-run python scripts/login.py            # Yahoo Finance
+     xvfb-run python scripts/login_reddit.py     # Reddit (Firefox)
+     xvfb-run python scripts/login_stocktwits.py # StockTwits
 
   3. Démarre le service :
      sudo systemctl start ${SERVICE_NAME}
