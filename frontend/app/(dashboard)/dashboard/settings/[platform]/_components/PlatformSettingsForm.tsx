@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader, PlayIcon, SaveIcon } from "lucide-react";
+import { KeyRoundIcon, Loader, PlayIcon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  loginPlatform,
   runPlatformCycle,
   togglePlatform,
   updatePlatformSettings,
@@ -34,8 +35,20 @@ const SLOT_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 export default function PlatformSettingsForm({ platform, displayName, initial }: Props) {
   const [pending, startTransition] = useTransition();
   const [triggerPending, startTriggerTransition] = useTransition();
+  const [loginPending, startLoginTransition] = useTransition();
   const [form, setForm] = useState<PlatformSettingsInput>(initial);
   const [slotsRaw, setSlotsRaw] = useState(initial.scheduleSlots.join("\n"));
+
+  // Parse credentials JSON into typed fields for the UI
+  const parsedCreds = (() => {
+    try { return JSON.parse(initial.credentialsJson || "{}"); }
+    catch { return {}; }
+  })();
+  const [credEmail, setCredEmail] = useState<string>(parsedCreds.email ?? "");
+  const [credPassword, setCredPassword] = useState<string>(parsedCreds.password ?? "");
+
+  // Whether this platform needs a password (Reddit uses magic links — no password)
+  const needsPassword = platform !== "reddit";
 
   function field<K extends keyof PlatformSettingsInput>(
     key: K,
@@ -61,6 +74,14 @@ export default function PlatformSettingsForm({ platform, displayName, initial }:
     });
   }
 
+  async function onLoginNow() {
+    startLoginTransition(async () => {
+      const res = await loginPlatform(platform);
+      if (res.ok) toast.success(res.detail ?? "Login successful");
+      else toast.error(res.error ?? "Login failed — check backend logs");
+    });
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const scheduleSlots = slotsRaw
@@ -74,10 +95,19 @@ export default function PlatformSettingsForm({ platform, displayName, initial }:
       return;
     }
 
+    // Build credentials JSON from typed fields
+    const creds: Record<string, string> = {};
+    if (credEmail.trim()) creds.email = credEmail.trim();
+    if (needsPassword && credPassword.trim()) creds.password = credPassword.trim();
+    const credentialsJson = Object.keys(creds).length > 0
+      ? JSON.stringify(creds, null, 2)
+      : "";
+
     startTransition(async () => {
       const res = await updatePlatformSettings(platform, {
         ...form,
         scheduleSlots,
+        credentialsJson,
       });
       if (res.ok) toast.success("Platform settings saved");
       else toast.error(res.error ?? "Error saving settings");
@@ -246,34 +276,64 @@ export default function PlatformSettingsForm({ platform, displayName, initial }:
         />
       </div>
 
-      {/* JSON config */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label>Credentials (JSON, sensitive)</Label>
-          <Textarea
-            rows={8}
-            value={form.credentialsJson}
-            onChange={(e) => field("credentialsJson", e.target.value)}
-            placeholder={`{\n  "clientId": "...",\n  "clientSecret": "..."\n}`}
-            className="font-mono text-xs max-h-64 overflow-y-auto"
-          />
-          <p className="text-xs text-muted-foreground">
-            DB values override <code>.env</code>. Leave empty to use <code>.env</code>.
-          </p>
+      {/* Credentials + Login */}
+      <div className="rounded-lg border p-4 grid gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold">Account Credentials</h3>
+            <p className="text-xs text-muted-foreground">
+              {platform === "reddit"
+                ? "Email linked to the Reddit account (magic link login)."
+                : "Email and password for the bot account on this platform."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loginPending || !credEmail.trim()}
+            onClick={onLoginNow}
+          >
+            {loginPending ? <Loader className="animate-spin" /> : <KeyRoundIcon className="size-4" />}
+            Login Now
+          </Button>
         </div>
-        <div className="grid gap-2">
-          <Label>Platform config (JSON)</Label>
-          <Textarea
-            rows={8}
-            value={form.configJson}
-            onChange={(e) => field("configJson", e.target.value)}
-            placeholder={`{\n  "subreddits": ["pennystocks"],\n  "skipKeywords": ["pump"]\n}`}
-            className="font-mono text-xs max-h-64 overflow-y-auto"
-          />
-          <p className="text-xs text-muted-foreground">
-            Adapter-specific options (subreddits, skipAuthors, skipKeywords, …)
-          </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label>Email</Label>
+            <Input
+              type="email"
+              value={credEmail}
+              onChange={(e) => setCredEmail(e.target.value)}
+              placeholder="bot@example.com"
+            />
+          </div>
+          {needsPassword && (
+            <div className="grid gap-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={credPassword}
+                onChange={(e) => setCredPassword(e.target.value)}
+                placeholder="platform password"
+              />
+            </div>
+          )}
         </div>
+      </div>
+
+      {/* Platform config (JSON) */}
+      <div className="grid gap-2">
+        <Label>Platform config (JSON)</Label>
+        <Textarea
+          rows={6}
+          value={form.configJson}
+          onChange={(e) => field("configJson", e.target.value)}
+          placeholder={`{\n  "searchQueries": ["VMAR"],\n  "skipAuthors": ["automoderator"]\n}`}
+          className="font-mono text-xs max-h-48 overflow-y-auto"
+        />
+        <p className="text-xs text-muted-foreground">
+          Adapter-specific options (searchQueries, skipAuthors, skipKeywords, …)
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-3">

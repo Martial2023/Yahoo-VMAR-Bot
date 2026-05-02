@@ -50,9 +50,30 @@ class RedditAdapter(PlatformAdapter):
             _SESSION_KEY, headless=True,
         )
         if not await self._check_session():
-            raise PlatformAuthError(
-                "Reddit session expired — re-run scripts/login_reddit.py"
-            )
+            # Session expired — attempt auto-login if credentials are configured
+            if await self._attempt_auto_login():
+                # Reload browser with fresh session
+                await self._browser.close()
+                await self._pw.stop()
+                self._pw, self._browser, _, self._page = await create_browser_for(
+                    _SESSION_KEY, headless=True,
+                )
+                if not await self._check_session():
+                    raise PlatformAuthError(
+                        "Reddit auto-login saved session but it is not valid"
+                    )
+            else:
+                raise PlatformAuthError(
+                    "Reddit session expired and auto-login failed — "
+                    "check credentials and IMAP config in the dashboard"
+                )
+
+    async def _attempt_auto_login(self) -> bool:
+        if not self._config or not self._config.credentials:
+            logger.warning("[reddit] no credentials configured — cannot auto-login")
+            return False
+        from botvmar.auth.auto_login import attempt_auto_login
+        return await attempt_auto_login("reddit", self._config.credentials)
 
     async def _check_session(self) -> bool:
         """Quick probe: load Reddit and verify we are logged in."""

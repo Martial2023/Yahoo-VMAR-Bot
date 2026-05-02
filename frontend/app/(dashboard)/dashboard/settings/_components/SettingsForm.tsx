@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { updateBotSettings, type SettingsInput } from "@/app/(actions)/actions";
+import { updateBotSettings, type SettingsInput, type ImapConfig } from "@/app/(actions)/actions";
 import { AI_MODELS, AI_PROVIDERS, findModelByOpenrouterId } from "@/lib/ai-models";
 
 type Props = {
@@ -29,6 +29,13 @@ export default function SettingsForm({ initial }: Props) {
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState<SettingsInput>(initial);
   const [emailsRaw, setEmailsRaw] = useState(initial.alertEmails.join(", "));
+  const [imap, setImap] = useState<ImapConfig>(
+    (initial.imapConfig as ImapConfig) ?? { host: "", port: 993, username: "", password: "", use_ssl: true },
+  );
+
+  function imapField<K extends keyof ImapConfig>(key: K, value: ImapConfig[K]) {
+    setImap((prev) => ({ ...prev, [key]: value }));
+  }
 
   function field<K extends keyof SettingsInput>(key: K, value: SettingsInput[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -41,8 +48,13 @@ export default function SettingsForm({ initial }: Props) {
       .map((s) => s.trim())
       .filter(Boolean);
 
+    // Only include IMAP config if host is filled in
+    const imapConfig = imap.host.trim()
+      ? imap
+      : null;
+
     startTransition(async () => {
-      const res = await updateBotSettings({ ...form, alertEmails: emails });
+      const res = await updateBotSettings({ ...form, alertEmails: emails, imapConfig });
       if (res.ok) toast.success("Settings saved — backend reloaded");
       else toast.error(res.error ?? "Error saving settings");
     });
@@ -172,6 +184,58 @@ export default function SettingsForm({ initial }: Props) {
             onChange={(e) => setEmailsRaw(e.target.value)}
             placeholder="alerte@vmar.local, ops@vmar.local"
           />
+        </div>
+      </div>
+
+      <div className="rounded-lg border p-4 grid gap-4">
+        <div>
+          <h3 className="font-semibold">IMAP Configuration</h3>
+          <p className="text-xs text-muted-foreground">
+            Required for auto-login (reads OTP codes and magic links from email).
+            Leave empty to disable auto-login.
+          </p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label>IMAP Host</Label>
+            <Input
+              value={imap.host}
+              onChange={(e) => imapField("host", e.target.value)}
+              placeholder="imap.gmail.com"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>IMAP Port</Label>
+            <Input
+              type="number"
+              value={imap.port}
+              onChange={(e) => imapField("port", Number(e.target.value))}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>IMAP Username</Label>
+            <Input
+              value={imap.username}
+              onChange={(e) => imapField("username", e.target.value)}
+              placeholder="bot@gmail.com"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>IMAP Password</Label>
+            <Input
+              type="password"
+              value={imap.password}
+              onChange={(e) => imapField("password", e.target.value)}
+              placeholder="app-password"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              checked={imap.use_ssl}
+              onCheckedChange={(v) => imapField("use_ssl", v)}
+            />
+            <Label>Use SSL</Label>
+          </div>
         </div>
       </div>
 

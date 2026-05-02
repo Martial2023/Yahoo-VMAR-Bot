@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getUser } from "@/lib/auth-session";
-import { reloadConfig, triggerPlatformCycle } from "@/lib/backend-api";
+import { reloadConfig, triggerPlatformCycle, triggerPlatformLogin } from "@/lib/backend-api";
 import prisma from "@/lib/prisma";
 
 async function requireUser() {
@@ -164,6 +164,16 @@ export async function runPlatformCycle(platform: string) {
   await requireUser();
   try {
     const result = await triggerPlatformCycle(platform);
+    return { ok: true, detail: result.detail };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export async function loginPlatform(platform: string) {
+  await requireUser();
+  try {
+    const result = await triggerPlatformLogin(platform);
     return { ok: true, detail: result.detail };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

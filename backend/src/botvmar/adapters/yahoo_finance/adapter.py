@@ -16,6 +16,7 @@ from botvmar.adapters.base import (
     Post,
 )
 from botvmar.browser.session import create_browser, refresh_session_if_needed
+from botvmar.config.platforms import PlatformConfig
 from botvmar.poster.actions import (
     SKIP_AUTHORS,
     post_new_comment,
@@ -34,7 +35,8 @@ class YahooFinanceAdapter(PlatformAdapter):
     name = "yahoo_finance"
     display_name = "Yahoo Finance"
 
-    def __init__(self, *, headless: bool = True) -> None:
+    def __init__(self, *, config: PlatformConfig | None = None, headless: bool = True) -> None:
+        self._config = config
         self._headless = headless
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
@@ -46,8 +48,31 @@ class YahooFinanceAdapter(PlatformAdapter):
             headless=self._headless
         )
         if not await refresh_session_if_needed(self._page):
-            # `refresh_session_if_needed` already notifies the operator.
-            raise PlatformAuthError("Yahoo session expired — re-run scripts/login.py")
+            # Session expired — attempt auto-login if credentials are configured
+            if await self._attempt_auto_login():
+                # Reload browser with the fresh session
+                await self._browser.close()
+                await self._pw.stop()
+                self._pw, self._browser, _, self._page = await create_browser(
+                    headless=self._headless
+                )
+                if not await refresh_session_if_needed(self._page):
+                    raise PlatformAuthError(
+                        "Yahoo auto-login saved session but it is not valid"
+                    )
+            else:
+                raise PlatformAuthError(
+                    "Yahoo session expired and auto-login failed — "
+                    "check credentials and IMAP config in the dashboard"
+                )
+
+    async def _attempt_auto_login(self) -> bool:
+        """Try auto-login using credentials from the dashboard."""
+        if not self._config or not self._config.credentials:
+            logger.warning("[yahoo] no credentials configured — cannot auto-login")
+            return False
+        from botvmar.auth.auto_login import attempt_auto_login
+        return await attempt_auto_login("yahoo_finance", self._config.credentials)
 
     async def cleanup(self) -> None:
         """Close browser & playwright. Never raises."""

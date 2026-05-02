@@ -18,12 +18,12 @@ logger = get_logger("adapter.registry")
 def _build_yahoo_finance(config: PlatformConfig) -> PlatformAdapter:
     # Local import to avoid loading Playwright at module import time.
     from botvmar.adapters.yahoo_finance import YahooFinanceAdapter
-    return YahooFinanceAdapter()
+    return YahooFinanceAdapter(config=config)
 
 
 def _build_stocktwits(config: PlatformConfig) -> PlatformAdapter:
     from botvmar.adapters.stocktwits import StockTwitsAdapter
-    return StockTwitsAdapter()
+    return StockTwitsAdapter(config=config)
 
 
 def _build_reddit(config: PlatformConfig) -> PlatformAdapter:

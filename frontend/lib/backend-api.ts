@@ -85,6 +85,12 @@ export async function reloadConfig(): Promise<{ ok: boolean; detail?: string }> 
   return call("/reload-config", { method: "POST" });
 }
 
+export async function triggerPlatformLogin(
+  platform: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  return call(`/login/${encodeURIComponent(platform)}`, { method: "POST" });
+}
+
 export async function stopBackend(): Promise<{ ok: boolean; detail?: string }> {
   return call("/stop", { method: "POST" });
 }

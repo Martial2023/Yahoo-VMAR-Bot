@@ -114,6 +114,42 @@ async def trigger_cycle_for_platform(platform: str) -> SimpleResponse:
     return SimpleResponse(ok=True, detail=f"trigger queued for {platform}")
 
 
+@app.post(
+    "/login/{platform}",
+    response_model=SimpleResponse,
+    dependencies=[Depends(_require_token)],
+)
+async def login_platform(platform: str) -> SimpleResponse:
+    """Trigger auto-login for a platform (fills credentials + IMAP OTP)."""
+    platform = platform.strip().lower()
+    if platform not in known_platforms():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown platform '{platform}'. Known: {known_platforms()}",
+        )
+
+    from botvmar.auth.auto_login import attempt_auto_login
+    from botvmar.config.platforms import load_one
+
+    config = await load_one(platform)
+    if not config or not config.credentials:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No credentials configured for '{platform}'. "
+            "Set email/password in the platform settings first.",
+        )
+
+    logger.info("Auto-login triggered via API for platform=%s", platform)
+    success = await attempt_auto_login(platform, config.credentials)
+
+    if success:
+        return SimpleResponse(ok=True, detail=f"{platform} login successful")
+    raise HTTPException(
+        status_code=500,
+        detail=f"{platform} auto-login failed — check backend logs for details",
+    )
+
+
 @app.post("/reload-config", response_model=SimpleResponse, dependencies=[Depends(_require_token)])
 async def reload_config() -> SimpleResponse:
     s = await runtime.load()

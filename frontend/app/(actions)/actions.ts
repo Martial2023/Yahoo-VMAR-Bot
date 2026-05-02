@@ -12,6 +12,14 @@ async function requireUser() {
   return user;
 }
 
+export type ImapConfig = {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  use_ssl: boolean;
+};
+
 export type SettingsInput = {
   botEnabled: boolean;
   mode: "reply" | "post" | "both";
@@ -25,6 +33,7 @@ export type SettingsInput = {
   replyPrompt: string;
   postPrompt: string;
   alertEmails: string[];
+  imapConfig: ImapConfig | null;
 };
 
 export async function updateBotSettings(input: SettingsInput) {
@@ -37,9 +46,13 @@ export async function updateBotSettings(input: SettingsInput) {
     return { ok: false, error: "Invalid mode" };
   }
 
+  const { imapConfig, ...rest } = input;
   await prisma.botSettings.update({
     where: { id: 1 },
-    data: input,
+    data: {
+      ...rest,
+      imapConfig: imapConfig as never ?? undefined,
+    },
   });
 
   // Demander au backend de recharger sa config (best-effort)

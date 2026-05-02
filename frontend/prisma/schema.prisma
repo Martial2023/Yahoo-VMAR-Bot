@@ -94,6 +94,7 @@ model BotSettings {
   replyPrompt       String   @db.Text                                       @map("reply_prompt")
   postPrompt        String   @db.Text                                       @map("post_prompt")
   alertEmails       String[] @default([])                                  @map("alert_emails")
+  imapConfig        Json?                                                  @map("imap_config")    // {host, port, username, password, use_ssl}
   updatedAt         DateTime @updatedAt                                    @map("updated_at")
 
   @@map("bot_settings")

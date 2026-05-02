@@ -113,6 +113,7 @@ export default async function SettingsPage() {
             replyPrompt: global.replyPrompt,
             postPrompt: global.postPrompt,
             alertEmails: global.alertEmails,
+            imapConfig: (global.imapConfig as Record<string, unknown> | null) ?? null,
           }}
         />
       </section>

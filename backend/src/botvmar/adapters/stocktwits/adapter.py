@@ -16,6 +16,7 @@ from botvmar.adapters.base import (
 from botvmar.adapters.stocktwits.actions import post_new_message, reply_to_message
 from botvmar.adapters.stocktwits.scraper import SKIP_AUTHORS, scrape_messages
 from botvmar.browser.session import create_browser_for
+from botvmar.config.platforms import PlatformConfig
 from botvmar.utils.logger import get_logger
 
 logger = get_logger("adapter.stocktwits")
@@ -29,7 +30,8 @@ class StockTwitsAdapter(PlatformAdapter):
     name = "stocktwits"
     display_name = "StockTwits"
 
-    def __init__(self, *, headless: bool = True) -> None:
+    def __init__(self, *, config: PlatformConfig | None = None, headless: bool = True) -> None:
+        self._config = config
         self._headless = headless
         self._pw: Playwright | None = None
         self._browser: Browser | None = None
@@ -42,9 +44,30 @@ class StockTwitsAdapter(PlatformAdapter):
         )
         # Validate session: navigate to StockTwits and check we're logged in
         if not await self._check_session():
-            raise PlatformAuthError(
-                "StockTwits session expired — re-run scripts/login_stocktwits.py"
-            )
+            # Session expired — attempt auto-login if credentials are configured
+            if await self._attempt_auto_login():
+                # Reload browser with fresh session
+                await self._browser.close()
+                await self._pw.stop()
+                self._pw, self._browser, _, self._page = await create_browser_for(
+                    _SESSION_KEY, headless=self._headless,
+                )
+                if not await self._check_session():
+                    raise PlatformAuthError(
+                        "StockTwits auto-login saved session but it is not valid"
+                    )
+            else:
+                raise PlatformAuthError(
+                    "StockTwits session expired and auto-login failed — "
+                    "check credentials and IMAP config in the dashboard"
+                )
+
+    async def _attempt_auto_login(self) -> bool:
+        if not self._config or not self._config.credentials:
+            logger.warning("[stocktwits] no credentials configured — cannot auto-login")
+            return False
+        from botvmar.auth.auto_login import attempt_auto_login
+        return await attempt_auto_login("stocktwits", self._config.credentials)
 
     async def _check_session(self) -> bool:
         """Quick probe: load StockTwits and verify we are logged in."""
