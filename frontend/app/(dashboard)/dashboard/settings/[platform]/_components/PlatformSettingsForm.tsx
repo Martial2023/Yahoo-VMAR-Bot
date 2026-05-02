@@ -336,8 +336,8 @@ export default function PlatformSettingsForm({ platform, displayName, initial }:
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={pending} className="min-w-32">
+      <div className="flex flex-wrap gap-3 w-full">
+        <Button type="submit" disabled={pending} className="min-w-32 w-full">
           {pending ? <Loader className="animate-spin" /> : <SaveIcon />}
           Save Settings
         </Button>

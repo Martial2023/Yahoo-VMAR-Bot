@@ -71,86 +71,84 @@ async def auto_login_yahoo(
         await human_delay(2.0, 4.0)
         await _safe_screenshot(page, "yahoo_login_page.png")
 
-        # Step 2: Enter email
-        email_selectors = ["#login-username", 'input[name="username"]']
-        typed = False
-        for sel in email_selectors:
-            try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=5000):
-                    await human_type(page, sel, email_addr)
-                    typed = True
-                    break
-            except Exception:
-                continue
-        if not typed:
-            logger.error("[yahoo] could not find email input")
+        # Step 2: Enter email in #username
+        email_sel = "#username"
+        try:
+            loc = page.locator(email_sel).first
+            if not await loc.is_visible(timeout=8000):
+                raise Exception("not visible")
+            await human_type(page, email_sel, email_addr)
+        except Exception:
+            logger.error("[yahoo] could not find email input (#username)")
             await _safe_screenshot(page, "yahoo_no_email_input.png")
             return False
 
         await human_delay(0.5, 1.0)
 
-        # Click Next/Sign in
-        next_selectors = ["#login-signin", 'button[name="signin"]', 'input[type="submit"]']
-        for sel in next_selectors:
-            try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=3000):
-                    await human_click(page, sel)
-                    break
-            except Exception:
-                continue
+        # Step 3: Click "Next" button (name="signin")
+        signin_sel = 'button[name="signin"]'
+        try:
+            await human_click(page, signin_sel)
+        except Exception:
+            logger.error("[yahoo] could not click signin/next button")
+            await _safe_screenshot(page, "yahoo_no_signin_btn.png")
+            return False
 
         await human_delay(3.0, 5.0)
         await _safe_screenshot(page, "yahoo_after_email.png")
 
-        # Step 3: Enter password (if password page appears)
-        pw_selectors = ["#login-passwd", 'input[name="password"]', 'input[type="password"]']
-        for sel in pw_selectors:
-            try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=8000):
-                    await human_type(page, sel, password)
-                    await human_delay(0.5, 1.0)
-                    # Click sign in
-                    for btn_sel in next_selectors:
-                        try:
-                            btn = page.locator(btn_sel).first
-                            if await btn.is_visible(timeout=3000):
-                                await human_click(page, btn_sel)
-                                break
-                        except Exception:
-                            continue
-                    break
-            except Exception:
-                continue
+        # Step 4: Enter password in #login-passwd
+        passwd_sel = "#login-passwd"
+        try:
+            loc = page.locator(passwd_sel).first
+            if not await loc.is_visible(timeout=10000):
+                raise Exception("not visible")
+            await human_type(page, passwd_sel, password)
+        except Exception:
+            logger.error("[yahoo] could not find password input (#login-passwd)")
+            await _safe_screenshot(page, "yahoo_no_passwd_input.png")
+            return False
+
+        await human_delay(0.5, 1.0)
+
+        # Step 5: Click "Next" button (name="validate") to submit password
+        validate_sel = 'button[name="validate"]'
+        try:
+            await human_click(page, validate_sel)
+        except Exception:
+            logger.error("[yahoo] could not click validate/next button after password")
+            await _safe_screenshot(page, "yahoo_no_validate_btn.png")
+            return False
 
         await human_delay(3.0, 6.0)
         await _safe_screenshot(page, "yahoo_after_password.png")
 
-        # Step 4: Check if OTP / verification code is required
-        otp_selectors = [
-            'input[name="verify_code"]',
-            'input[name="code"]',
-            "#verification-code-field",
-            'input[data-test-id="verify-code-input"]',
-            'input[type="tel"]',  # Yahoo sometimes uses tel for OTP
-        ]
+        # Step 6: Click the "Send verification code" button (#200)
+        # Yahoo shows a challenge page where user must request the code
+        send_code_sel = "button#200"
+        try:
+            loc = page.locator(send_code_sel).first
+            if await loc.is_visible(timeout=10000):
+                logger.info("[yahoo] verification challenge detected — requesting code")
+                await human_click(page, send_code_sel)
+                await human_delay(3.0, 5.0)
+                await _safe_screenshot(page, "yahoo_after_send_code.png")
+            else:
+                # No challenge page — maybe already logged in or different flow
+                logger.info("[yahoo] no verification challenge button found, checking state...")
+        except Exception:
+            logger.info("[yahoo] no #200 button — skipping send-code step")
 
-        otp_needed = False
-        otp_sel_found = ""
-        for sel in otp_selectors:
-            try:
-                loc = page.locator(sel).first
-                if await loc.is_visible(timeout=10000):
-                    otp_needed = True
-                    otp_sel_found = sel
-                    break
-            except Exception:
-                continue
+        # Step 7: Fill OTP digits one by one (#verify-code-0 through #verify-code-5)
+        otp_first_sel = "#verify-code-0"
+        try:
+            loc = page.locator(otp_first_sel).first
+            otp_needed = await loc.is_visible(timeout=10000)
+        except Exception:
+            otp_needed = False
 
         if otp_needed:
-            logger.info("[yahoo] OTP verification required — polling IMAP...")
+            logger.info("[yahoo] OTP input detected — polling IMAP for verification code...")
             before_ts = time.time() - 30
 
             msg = await asyncio.to_thread(
@@ -174,37 +172,40 @@ async def auto_login_yahoo(
 
             logger.info("[yahoo] OTP extracted: %s", code)
 
-            # Type the OTP
-            await human_type(page, otp_sel_found, code)
+            # Type each digit into its respective input field
+            for i, digit in enumerate(code[:6]):
+                digit_sel = f"#verify-code-{i}"
+                try:
+                    await page.locator(digit_sel).first.fill(digit)
+                    await human_delay(0.1, 0.3)
+                except Exception as e:
+                    logger.error("[yahoo] failed to fill digit %d: %s", i, e)
+                    return False
+
             await human_delay(0.5, 1.0)
 
-            # Submit
-            submit_selectors = [
-                'button[type="submit"]',
-                "#verify-code-button",
-                'button:has-text("Verify")',
-                'button:has-text("Submit")',
-            ]
-            for sel in submit_selectors:
+            # Step 8: Click "Next" to submit the OTP (name="validate")
+            try:
+                await human_click(page, validate_sel)
+            except Exception:
+                # Try generic submit as fallback
                 try:
-                    btn = page.locator(sel).first
-                    if await btn.is_visible(timeout=3000):
-                        await human_click(page, sel)
-                        break
+                    await human_click(page, 'button[type="submit"]')
                 except Exception:
-                    continue
+                    logger.error("[yahoo] could not submit OTP")
+                    return False
 
             await human_delay(5.0, 8.0)
             await _safe_screenshot(page, "yahoo_after_otp.png")
 
-        # Step 5: Verify login success
+        # Step 9: Verify login success
         current_url = page.url
         if "login.yahoo.com" in current_url:
             logger.error("[yahoo] login failed — still on login page: %s", current_url)
             await _safe_screenshot(page, "yahoo_login_failed.png")
             return False
 
-        # Step 6: Save session
+        # Step 10: Save session
         session_path = _session_path_for(_PLATFORM_KEY)
         session_path.parent.mkdir(parents=True, exist_ok=True)
         state = await context.storage_state()
