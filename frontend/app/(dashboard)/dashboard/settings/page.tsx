@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import prisma from "@/lib/prisma";
 
+import { type ImapConfig } from "@/app/(actions)/actions";
 import SettingsForm from "./_components/SettingsForm";
 
 export const dynamic = "force-dynamic";
@@ -113,7 +114,7 @@ export default async function SettingsPage() {
             replyPrompt: global.replyPrompt,
             postPrompt: global.postPrompt,
             alertEmails: global.alertEmails,
-            imapConfig: (global.imapConfig as Record<string, unknown> | null) ?? null,
+            imapConfig: (global.imapConfig as ImapConfig | null) ?? null,
           }}
         />
       </section>
